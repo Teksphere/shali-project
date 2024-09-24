@@ -9,53 +9,39 @@ packer {
 
 variable "ami_id" {
   type    = string
-  default = "ami-05134c8ef96964280"
-}
-
-variable "efs_mount_point" {
-  type    = string
-  default = ""
-}
-
-variable "ssh_private_key_file" {
-  type    = string
-  default = "C:/Users/USER/Desktop/devops/keys/us-west-key.pem"
+  default = "ami-05134c8ef96964280"  // Ubuntu 22.04 LTS in us-west-2
 }
 
 locals {
-  app_name = "proxy-server"
+  app_name = "hardened-ubuntu-ec2"
 }
 
-source "amazon-ebs" "proxy" {
-  ami_name           = "${local.app_name}"
-  instance_type      = "t2.medium"
-  region             = "us-west-2"
-  availability_zone  = "us-west-2a"
-  source_ami         = "${var.ami_id}"
-  ssh_username       = "ubuntu"
-  ssh_keypair_name   = "us-west-key"
-  ssh_private_key_file = "${var.ssh_private_key_file}"
-  
+source "amazon-ebs" "hardened" {
+  ami_name      = "${local.app_name}-{{timestamp}}"
+  instance_type = "t2.medium"
+  region        = "us-west-2"
+  source_ami    = "${var.ami_id}"
+  ssh_username  = "ubuntu"  // Changed to ubuntu for Ubuntu AMIs
   tags = {
-    Env  = "dev"
+    Env  = "prod"
     Name = "${local.app_name}"
   }
 }
 
 build {
-  sources = ["source.amazon-ebs.proxy"]
-
-  provisioner "shell" {
-    inline = [
-      "sudo apt update -y",
-      "sudo apt upgrade -y",
-      "sudo apt install -y python3"
-    ]
-  }
+  sources = ["source.amazon-ebs.hardened"]
 
   provisioner "ansible" {
-    playbook_file   = "ansible/hardening.yml"
-    extra_arguments = ["--verbose"]
-    ansible_env_vars = ["ANSIBLE_STDOUT_CALLBACK=debug"]
+    playbook_file = "ansible/harden-ubuntu-ec2.yaml"
+    extra_arguments = [
+      "--extra-vars", "ami_id=${var.ami_id}",
+      "--scp-extra-args", "'-O'",
+      "--ssh-extra-args", "-o IdentitiesOnly=yes -o HostKeyAlgorithms=+ssh-rsa -o PubkeyAcceptedAlgorithms=+ssh-rsa"
+    ]
+  }
+  
+  post-processor "manifest" {
+    output = "manifest.json"
+    strip_path = true
   }
 }

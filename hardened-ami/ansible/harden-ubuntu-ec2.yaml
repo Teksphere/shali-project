@@ -1,0 +1,99 @@
+---
+- name: Harden Ubuntu EC2 Instance
+  hosts: all
+  become: yes
+  vars:
+    wazuh_agent_version: "4.3.10"
+
+  tasks:
+    - name: Update and upgrade all packages
+      ansible.builtin.apt:
+        upgrade: full
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Install necessary security packages
+      ansible.builtin.apt:
+        name:
+          - aide
+          - auditd
+          - fail2ban
+          - ufw
+        state: present
+
+    - name: Disable unnecessary services
+      ansible.builtin.service:
+        name: "{{ item }}"
+        state: stopped
+        enabled: no
+      loop:
+        - rpcbind
+        - cups
+
+    - name: Configure SSH
+      ansible.builtin.lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: "{{ item.regexp }}"
+        line: "{{ item.line }}"
+      loop:
+        - { regexp: '^PermitRootLogin', line: 'PermitRootLogin no' }
+        - { regexp: '^PasswordAuthentication', line: 'PasswordAuthentication no' }
+        - { regexp: '^X11Forwarding', line: 'X11Forwarding no' }
+        - { regexp: '^MaxAuthTries', line: 'MaxAuthTries 3' }
+      notify: Restart sshd
+
+    - name: Set up UFW rules
+      community.general.ufw:
+        rule: allow
+        port: "{{ item }}"
+      loop:
+        - '22'
+        - '80'
+        - '443'
+
+    - name: Enable UFW
+      community.general.ufw:
+        state: enabled
+
+    - name: Install Wazuh GPG key
+      ansible.builtin.apt_key:
+        url: https://packages.wazuh.com/key/GPG-KEY-WAZUH
+        state: present
+
+    - name: Add Wazuh repository
+      ansible.builtin.apt_repository:
+        repo: deb https://packages.wazuh.com/4.x/apt/ stable main
+        state: present
+
+    - name: Install Wazuh agent
+      ansible.builtin.apt:
+        name: wazuh-agent={{ wazuh_agent_version }}-1
+        state: present
+        update_cache: yes
+
+    - name: Configure Wazuh agent
+      ansible.builtin.lineinfile:
+        path: /var/ossec/etc/ossec.conf
+        regexp: "{{ item.regexp }}"
+        line: "{{ item.line }}"
+      loop:
+        - { regexp: '<address>', line: '    <address>your-wazuh-manager-address</address>' }
+        - { regexp: '<server-hostname>', line: '    <server-hostname>your-wazuh-manager-hostname</server-hostname>' }
+      notify: Restart Wazuh agent
+
+    - name: Enable and start Wazuh agent
+      ansible.builtin.service:
+        name: wazuh-agent
+        state: started
+        enabled: yes
+
+  handlers:
+    - name: Restart sshd
+      ansible.builtin.service:
+        name: sshd
+        state: restarted
+
+    - name: Restart Wazuh agent
+      ansible.builtin.service:
+        name: wazuh-agent
+        state: restarted
