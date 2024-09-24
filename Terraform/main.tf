@@ -14,7 +14,7 @@ resource "aws_subnet" "public" {
   count             = 2
   vpc_id            = aws_vpc.main.id
   cidr_block        = "10.0.${count.index + 1}.0/24"
-  availability_zone = data.aws_availability_zones.available.names[count.index]
+  availability_zone = "us-west-2a"
 
   tags = {
     Name = "SHALI-Public-Subnet-${count.index + 1}"
@@ -26,7 +26,7 @@ resource "aws_subnet" "private" {
   count             = 2
   vpc_id            = aws_vpc.main.id
   cidr_block        = "10.0.${count.index + 10}.0/24"
-  availability_zone = data.aws_availability_zones.available.names[count.index]
+  availability_zone = "us-west-2b"
 
   tags = {
     Name = "SHALI-Private-Subnet-${count.index + 1}"
