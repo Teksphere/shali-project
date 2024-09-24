@@ -17,25 +17,25 @@ variable "efs_mount_point" {
   default = ""
 }
 
+variable "ssh_private_key_file" {
+  type    = string
+  default = "C:/Users/USER/Desktop/devops/keys/us-west-key.pem"
+}
+
 locals {
   app_name = "proxy-server"
 }
 
 source "amazon-ebs" "proxy" {
-  ami_name      = "${local.app_name}"
-  instance_type = "t2.medium"
-  region        = "us-west-2"
-  availability_zone = "us-west-2a"
-  source_ami    = "${var.ami_id}"
-  ssh_username  = "ubuntu"
+  ami_name           = "${local.app_name}"
+  instance_type      = "t2.medium"
+  region             = "us-west-2"
+  availability_zone  = "us-west-2a"
+  source_ami         = "${var.ami_id}"
+  ssh_username       = "ubuntu"
+  ssh_keypair_name   = "us-west-key"
+  ssh_private_key_file = "${var.ssh_private_key_file}"
   
-  # Option 1: Use ssh_keypair_name with ssh_private_key_file
-  ssh_keypair_name = "us-west-key"
-  ssh_private_key_file = "C:\Users\USER\Desktop\devops\keys/us-west-key.pem"
-  
-  # Option 2: Use ssh_agent_auth
-  # ssh_agent_auth = true
-
   tags = {
     Env  = "dev"
     Name = "${local.app_name}"
