@@ -26,10 +26,11 @@ source "amazon-ebs" "proxy" {
   instance_type = "t2.medium"
   region        = "us-west-2"
   availability_zone = "us-west-2a"
-  source_ami = "${var.ami_id}"
-  ssh_username = "ubuntu"
+  source_ami    = "${var.ami_id}"
+  ssh_username  = "ubuntu"
+  ssh_keypair_name = "us-west-key"  # Add your AWS key pair name here
   tags = {
-    Env = "dev"
+    Env  = "dev"
     Name = "${local.app_name}"
   }
 }
@@ -40,11 +41,14 @@ build {
   provisioner "shell" {
     inline = [
       "sudo apt update -y",
-      "sudo apt upgrade -y"
+      "sudo apt upgrade -y",
+      "sudo apt install -y python3"
     ]
   }
 
   provisioner "ansible" {
-    playbook_file = "ansible/hardening.yml"
+    playbook_file   = "ansible/hardening.yml"
+    extra_arguments = ["--verbose"]
+    ansible_env_vars = ["ANSIBLE_STDOUT_CALLBACK=debug"]
   }
 }
