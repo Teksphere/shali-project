@@ -1,32 +1,32 @@
-packer {
-  required_plugins {
-    amazon = {
-      version = ">= 1.0.0"
-      source  = "github.com/hashicorp/amazon"
-    }
-  }
+variable "ami_id" {
+  type    = string
+  default = "ami-05134c8ef96964280"
 }
 
-source "amazon-ebs" "hardened-ami" {
-  ami_name      = "hardened-ami-{{timestamp}}"
+variable "efs_mount_point" {
+  type    = string
+  default = ""
+}
+
+locals {
+  app_name = "proxy-server"
+}
+
+source "amazon-ebs" "proxy" {
+  ami_name      = "${local.app_name}"
   instance_type = "t2.medium"
   region        = "us-west-2"
-  source_ami_filter {
-    filters = {
-      name                = "amzn2-ami-hvm-*-x86_64-gp2"
-      root-device-type    = "ebs"
-      virtualization-type = "hvm"
-    }
-    most_recent = true
-    owners      = ["amazon"]
-  }
+  availability_zone = "us-west-2a"
+  source_ami = "${var.ami_id}"
   ssh_username = "ubuntu"
+  tags = {
+    Env = "dev"
+    Name = "${local.app_name}"
+  }
 }
 
 build {
-  sources = [
-    "source.amazon-ebs.hardened-ami"
-  ]
+  sources = ["source.amazon-ebs.proxy"]
 
   provisioner "shell" {
     inline = [
@@ -36,6 +36,6 @@ build {
   }
 
   provisioner "ansible" {
-    playbook_file = "./hardening.yml"
+    playbook_file = "ansible/hardening.yml"
   }
 }
