@@ -1,0 +1,54 @@
+---
+- name: Harden AMI
+  hosts: all
+  become: yes
+
+  tasks:
+    - name: Disable unnecessary services
+      systemd:
+        name: "{{ item }}"
+        state: stopped
+        enabled: no
+      with_items:
+        - rpcbind
+        - postfix
+
+    - name: Apply latest security patches
+      yum:
+        name: '*'
+        state: latest
+        security: yes
+
+    - name: Configure secure SSH settings
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: "{{ item.regexp }}"
+        line: "{{ item.line }}"
+      with_items:
+        - { regexp: '^PermitRootLogin', line: 'PermitRootLogin no' }
+        - { regexp: '^PasswordAuthentication', line: 'PasswordAuthentication no' }
+        - { regexp: '^X11Forwarding', line: 'X11Forwarding no' }
+      notify: Restart sshd
+
+    - name: Install Wazuh agent
+      yum:
+        name: https://packages.wazuh.com/4.x/yum/wazuh-agent-4.3.10-1.x86_64.rpm
+        state: present
+
+    - name: Configure Wazuh agent
+      template:
+        src: ossec.conf.j2
+        dest: /var/ossec/etc/ossec.conf
+      notify: Restart Wazuh agent
+
+  handlers:
+    - name: Restart sshd
+      systemd:
+        name: sshd
+        state: restarted
+
+    - name: Restart Wazuh agent
+      systemd:
+        name: wazuh-agent
+        state: restarted
+        enabled: yes
